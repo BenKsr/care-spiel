@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Die unsichtbare Uhr</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Courier+Prime:wght@400;700&display=swap">
+<link rel="stylesheet" href="/style.css">
+<style>
+  .wrap {
+    max-width: 520px;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: calc(14px + env(safe-area-inset-top, 0px)) calc(40px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .topbar { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-bottom: 2px solid var(--ink); padding-bottom: 6px; }
+  .topbar .brand { font-family: var(--f-display); font-variation-settings: "wdth" 70; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.95rem; }
+  .topbar .who { font-family: var(--f-mono); font-size: 0.85rem; color: var(--ink-2); text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Beitritt */
+  .join { padding: 22px 18px 20px; display: flex; flex-direction: column; gap: 18px; }
+  .join h1 { font-size: clamp(2.4rem, 12vw, 3.6rem); font-variation-settings: "wdth" 64; text-transform: uppercase; }
+  .join .lede { color: var(--ink-2); max-width: 34ch; }
+  .join label { display: flex; flex-direction: column; gap: 4px; }
+  .codefield { text-transform: uppercase; letter-spacing: 0.4em; }
+  .err { color: var(--alert); font-size: 0.95rem; min-height: 1.4em; }
+
+  .epoch { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; align-items: end; padding: 4px 0 2px; }
+  .epoch .year { font-family: var(--f-mono); font-weight: 700; font-size: 2.6rem; line-height: 0.9; color: var(--stamp); grid-row: span 2; }
+  .epoch h2 { font-size: 1.45rem; text-transform: uppercase; }
+  .epoch .place { color: var(--muted); font-size: 0.9rem; }
+
+  .role { padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+  .role h3 { font-size: 2rem; font-variation-settings: "wdth" 66; text-transform: uppercase; }
+  .role .facts { display: flex; flex-wrap: wrap; gap: 6px 14px; font-family: var(--f-mono); font-size: 0.85rem; color: var(--ink-2); margin-top: 4px; }
+  .role .stamp-mark { position: absolute; top: 14px; right: 14px; }
+
+  .hh { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .hh-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .hh-head strong { font-family: var(--f-display); font-variation-settings: "wdth" 75; font-size: 1.15rem; text-transform: uppercase; }
+  .event { background: var(--care-soft); border-left: 4px solid var(--care); padding: 8px 10px; font-size: 0.95rem; }
+  .event b { font-family: var(--f-mono); }
+  .members { font-size: 0.85rem; color: var(--muted); }
+
+  .planner { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.8rem; color: var(--ink-2); }
+  .rows { display: flex; flex-direction: column; }
+  .row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px dashed var(--rule); }
+  .row .what { min-width: 0; }
+  .row .what b { display: block; font-family: var(--f-display); font-variation-settings: "wdth" 80; font-size: 1.02rem; }
+  .row .what small { color: var(--muted); font-size: 0.82rem; display: block; line-height: 1.35; }
+  .stepper { display: flex; align-items: center; gap: 4px; }
+  .stepper button { width: 44px; height: 44px; border: 2px solid var(--ink); background: var(--card); border-radius: var(--r); font-family: var(--f-mono); font-size: 1.3rem; font-weight: 700; line-height: 1; }
+  .stepper button:disabled { opacity: 0.3; cursor: not-allowed; }
+  .stepper output { width: 2.4ch; text-align: center; font-family: var(--f-mono); font-size: 1.5rem; font-weight: 700; }
+  .rest-val { font-family: var(--f-mono); font-size: 1.5rem; font-weight: 700; padding-right: 48px; }
+  .rest-val.low { color: var(--alert); }
+  .warn { color: var(--alert); font-size: 0.85rem; }
+
+  .choice { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; border-color: var(--stamp); }
+  .choice h3 { font-size: 1.25rem; text-transform: uppercase; color: var(--stamp); }
+  .toggle { display: flex; gap: 8px; }
+  .toggle button { flex: 1; padding: 0.7em 0.5em; border: 2px solid var(--stamp); background: var(--card); color: var(--stamp); border-radius: var(--r); font-family: var(--f-display); font-variation-settings: "wdth" 80; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.9rem; }
+  .toggle button[aria-pressed="true"] { background: var(--stamp); color: var(--card); }
+
+  .submitted { text-align: center; padding: 18px 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .submitted .stamp-mark { font-size: 1.3rem; padding: 0.25em 0.8em; }
+
+  .timer { font-family: var(--f-mono); font-weight: 700; color: var(--alert); }
+
+  .result { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .big { font-family: var(--f-mono); font-weight: 700; font-size: 2.6rem; line-height: 1; }
+  .kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 0.95rem; }
+  .kv span:nth-child(even) { font-family: var(--f-mono); text-align: right; }
+  .note { font-size: 0.92rem; color: var(--ink-2); border-top: 1px dashed var(--rule); padding-top: 10px; }
+
+  .wait { padding: 26px 18px; text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  .wait h2 { font-size: 1.8rem; text-transform: uppercase; }
+  .tick { width: 54px; height: 54px; border-radius: 50%; border: 3px solid var(--ink); position: relative; }
+  .tick::after { content: ""; position: absolute; left: 50%; top: 7px; width: 3px; height: 21px; background: var(--stamp); transform-origin: 50% 100%; animation: spin 4s linear infinite; margin-left: -1.5px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<main class="wrap" id="app" aria-live="polite">
+  <section class="card join">
+    <h1>Die unsichtbare Uhr</h1>
+    <p class="lede">Lade die Seite, um beizutreten.</p>
+  </section>
+</main>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/player.js"></script>
+</body>
+</html>

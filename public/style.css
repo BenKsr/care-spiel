@@ -1,0 +1,219 @@
+/* Die unsichtbare Uhr
+   Richtung: Stechkarte und Kanzleipapier. Grünlich-graues Amtspapier, Tinte,
+   violetter Stempel. Die 16 Stunden eines Tages als gelochte Zellen.
+   Ocker markiert Care-Arbeit: das, was sonst nicht gezählt wird. */
+:root {
+  --paper: #e6eae2;
+  --card: #f4f5ef;
+  --card-2: #eceee6;
+  --ink: #18202c;
+  --ink-2: #3b4452;
+  --muted: #6a7280;
+  --rule: #c3c9be;
+  --rule-strong: #8d958a;
+  --stamp: #5b3d98;
+  --stamp-soft: #e4ddf0;
+  --work: #2c4f78;
+  --care: #d9a72e;
+  --care-soft: #f3e3b3;
+  --paid: #a8741c;
+  --rest: #a9bda9;
+  --alert: #a8352b;
+  --ok: #3d6b4a;
+
+  --f-display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-mono: "Courier Prime", "Courier New", Courier, monospace;
+
+  --r: 3px;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 16px;
+  line-height: 1.5;
+  font-variation-settings: "wdth" 100;
+  -webkit-font-smoothing: antialiased;
+  /* feines Karopapier */
+  background-image:
+    linear-gradient(to right, rgba(24, 32, 44, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(24, 32, 44, 0.035) 1px, transparent 1px);
+  background-size: 22px 22px;
+  min-height: 100vh;
+}
+
+h1, h2, h3 {
+  font-family: var(--f-display);
+  font-variation-settings: "wdth" 72;
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  margin: 0;
+}
+p { margin: 0; }
+
+.mono { font-family: var(--f-mono); }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+.label {
+  font-family: var(--f-display);
+  font-variation-settings: "wdth" 85;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--stamp); outline-offset: 2px; }
+
+.btn {
+  appearance: none;
+  border: 2px solid var(--ink);
+  background: var(--ink);
+  color: var(--card);
+  font-family: var(--f-display);
+  font-variation-settings: "wdth" 80;
+  font-weight: 800;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.8em 1.3em;
+  border-radius: var(--r);
+  transition: transform 0.08s ease, background 0.15s ease;
+}
+.btn:hover { background: var(--ink-2); border-color: var(--ink-2); }
+.btn:active { transform: translateY(1px); }
+.btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.ghost:hover { background: var(--card-2); }
+.btn.stamp { background: var(--stamp); border-color: var(--stamp); }
+.btn.small { font-size: 0.8rem; padding: 0.5em 0.9em; }
+.btn.block { width: 100%; }
+
+.field {
+  width: 100%;
+  border: 0;
+  border-bottom: 2px solid var(--ink);
+  background: transparent;
+  padding: 0.4em 0.1em;
+  font-size: 1.5rem;
+  font-family: var(--f-mono);
+  border-radius: 0;
+}
+.field:focus { outline: none; border-bottom-color: var(--stamp); background: rgba(91, 61, 152, 0.05); }
+
+/* Karte: eine Stechkarte mit Lochrand oben */
+.card {
+  background: var(--card);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r);
+  position: relative;
+  box-shadow: 0 1px 0 var(--rule), 0 8px 18px -14px rgba(24, 32, 44, 0.45);
+}
+
+/* Stempel */
+.stamp-mark {
+  display: inline-block;
+  font-family: var(--f-mono);
+  font-weight: 700;
+  color: var(--stamp);
+  border: 2px solid var(--stamp);
+  border-radius: 4px;
+  padding: 0.15em 0.55em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  transform: rotate(-3deg);
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+/* Stundenleiste: 16 Zellen */
+.hours {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 3px;
+}
+.hours .cell {
+  aspect-ratio: 1 / 1.6;
+  max-width: 100%;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: var(--card);
+  position: relative;
+  transition: background 0.15s ease;
+}
+.hours .cell.E { background: var(--work); border-color: var(--work); }
+.hours .cell.C { background: var(--care); border-color: var(--paid); }
+.hours .cell.B {
+  background: repeating-linear-gradient(135deg, var(--care) 0 4px, var(--paid) 4px 7px);
+  border-color: var(--paid);
+}
+.hours .cell.R { background: var(--rest); border-color: #8ea58e; }
+.hours .cell.S { background: var(--stamp-soft); border-color: var(--stamp); }
+.hour-scale {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 3px;
+  margin-top: 4px;
+  font-family: var(--f-mono);
+  font-size: 0.62rem;
+  color: var(--muted);
+}
+.hour-scale span:nth-child(odd) { visibility: hidden; }
+
+.swatch { display: inline-block; width: 0.9em; height: 0.9em; border-radius: 2px; vertical-align: -0.1em; margin-right: 0.35em; }
+.swatch.E { background: var(--work); }
+.swatch.C { background: var(--care); }
+.swatch.B { background: repeating-linear-gradient(135deg, var(--care) 0 3px, var(--paid) 3px 5px); }
+.swatch.R { background: var(--rest); }
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  font-family: var(--f-display);
+  font-variation-settings: "wdth" 85;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.2em 0.6em;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+.pill.ok { color: var(--ok); }
+.pill.warn { color: var(--paid); }
+.pill.bad { color: var(--alert); }
+.pill.neutral { color: var(--muted); }
+
+.meter { height: 8px; background: var(--card-2); border: 1px solid var(--rule); border-radius: 2px; overflow: hidden; }
+.meter > i { display: block; height: 100%; background: var(--ok); transition: width 0.4s ease; }
+.meter.mid > i { background: var(--care); }
+.meter.low > i { background: var(--alert); }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--card);
+  padding: 0.7em 1.1em;
+  border-radius: var(--r);
+  font-size: 0.95rem;
+  max-width: calc(100% - 32px);
+  z-index: 20;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

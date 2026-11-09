@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Die unsichtbare Uhr · Spielleitung</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Courier+Prime:wght@400;700&display=swap">
+<link rel="stylesheet" href="/style.css">
+<style>
+  body { font-size: 17px; }
+  .shell {
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    padding-left: max(28px, env(safe-area-inset-left, 0px));
+    padding-right: max(28px, env(safe-area-inset-right, 0px));
+    padding-block: 18px 18px;
+    gap: 22px;
+    max-width: 1680px;
+    margin: 0 auto;
+  }
+  .masthead { display: flex; justify-content: space-between; align-items: center; gap: 16px; border-bottom: 3px solid var(--ink); padding-bottom: 10px; flex-wrap: wrap; }
+  .masthead .brand { font-family: var(--f-display); font-variation-settings: "wdth" 64; font-weight: 900; font-size: 1.6rem; text-transform: uppercase; letter-spacing: 0.02em; }
+  .masthead .meta { display: flex; gap: 18px; align-items: center; font-family: var(--f-mono); color: var(--ink-2); flex-wrap: wrap; }
+  .masthead .code { font-weight: 700; color: var(--stamp); letter-spacing: 0.25em; font-size: 1.3rem; }
+
+  .dock { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--rule-strong); padding-top: 12px; }
+  .dock .left, .dock .right { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .count { font-family: var(--f-mono); font-size: 1.05rem; }
+
+  /* Startbildschirm */
+  .intro { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 48px; align-items: center; }
+  .intro h1 { font-size: clamp(3.4rem, 9vw, 8.5rem); font-variation-settings: "wdth" 62; text-transform: uppercase; line-height: 0.88; }
+  .intro .sub { font-size: 1.25rem; max-width: 40ch; color: var(--ink-2); margin-top: 22px; }
+  .intro .clock { width: min(380px, 100%); aspect-ratio: 1; margin: 0 auto; }
+
+  /* Lobby */
+  .lobby { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 40px; align-items: start; }
+  .joinbox { padding: 28px; display: flex; flex-direction: column; gap: 18px; }
+  .joinbox .bigcode { font-family: var(--f-mono); font-weight: 700; font-size: clamp(4rem, 9vw, 7.5rem); letter-spacing: 0.18em; color: var(--stamp); line-height: 1; }
+  .joinbox .url { font-family: var(--f-mono); font-size: 1.15rem; word-break: break-all; }
+  .qr { background: var(--card); padding: 10px; border: 1px solid var(--rule); width: max-content; max-width: 100%; }
+  .qr img, .qr canvas { display: block; max-width: 100%; }
+  .roster h2 { font-size: 2.4rem; text-transform: uppercase; margin-bottom: 14px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { background: var(--card); border: 1px solid var(--rule-strong); border-radius: var(--r); padding: 6px 10px 6px 12px; font-family: var(--f-mono); display: inline-flex; align-items: center; gap: 8px; }
+  .chip.off { opacity: 0.5; }
+  .chip button { border: 0; background: none; color: var(--muted); font-size: 1rem; padding: 0 2px; line-height: 1; }
+  .chip button:hover { color: var(--alert); }
+
+  /* Spielrunde */
+  .stage { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr); gap: 40px; align-items: start; }
+  .era .year { font-family: var(--f-mono); font-weight: 700; color: var(--stamp); font-size: clamp(4rem, 10vw, 9rem); line-height: 0.85; }
+  .era h1 { font-size: clamp(2.4rem, 4.6vw, 4.4rem); font-variation-settings: "wdth" 64; text-transform: uppercase; margin-top: 10px; }
+  .era .place { color: var(--muted); font-family: var(--f-mono); margin-top: 6px; }
+  .era .history { display: flex; flex-direction: column; gap: 12px; margin-top: 22px; max-width: 58ch; font-size: 1.12rem; }
+  .rulebox { margin-top: 22px; padding: 16px 18px; border: 2px solid var(--stamp); background: var(--stamp-soft); border-radius: var(--r); max-width: 58ch; }
+  .rulebox .label { color: var(--stamp); }
+
+  .hhgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .hhcard { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .hhcard header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .hhcard header strong { font-family: var(--f-display); font-variation-settings: "wdth" 72; font-weight: 800; font-size: 1.35rem; text-transform: uppercase; }
+  .hhcard .event { background: var(--care-soft); border-left: 4px solid var(--care); padding: 6px 9px; font-size: 0.95rem; }
+  .hhcard .event b { font-family: var(--f-mono); }
+  .people { display: flex; flex-direction: column; gap: 3px; font-size: 0.92rem; }
+  .people .p { display: grid; grid-template-columns: 14px 1fr auto; gap: 8px; align-items: center; }
+  .people .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--rule-strong); }
+  .people .dot.done { background: var(--stamp); border-color: var(--stamp); }
+  .people .role { color: var(--muted); font-size: 0.82rem; font-family: var(--f-mono); text-align: right; }
+
+  /* Ergebnis */
+  .results { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 36px; align-items: start; }
+  .section-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .section-h h2 { font-size: 2.2rem; text-transform: uppercase; }
+  .tablewrap { overflow-x: auto; }
+  table.ledger { width: 100%; border-collapse: collapse; font-size: 1rem; background: var(--card); border: 1px solid var(--rule-strong); }
+  .ledger th, .ledger td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  .ledger th { font-family: var(--f-display); font-variation-settings: "wdth" 80; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 700; background: var(--card-2); }
+  .ledger td { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+  .ledger th:first-child, .ledger td:first-child { text-align: left; font-family: var(--f-display); font-variation-settings: "wdth" 80; font-weight: 700; }
+  .ledger td.miss { color: var(--alert); font-weight: 700; }
+  .ledger td.care { background: var(--care-soft); }
+
+  .rank { list-style: none; margin: 0; padding: 0; counter-reset: r; background: var(--card); border: 1px solid var(--rule-strong); }
+  .rank li { counter-increment: r; display: grid; grid-template-columns: 2.4em 1fr auto; gap: 10px; align-items: baseline; padding: 8px 12px; border-bottom: 1px solid var(--rule); }
+  .rank li::before { content: counter(r); font-family: var(--f-mono); color: var(--muted); }
+  .rank li:first-child { background: var(--stamp-soft); }
+  .rank .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rank .n small { color: var(--muted); font-family: var(--f-mono); margin-left: 6px; }
+  .rank .v { font-family: var(--f-mono); font-weight: 700; }
+  .callouts { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+  .callout { padding: 12px 14px; border-left: 4px solid var(--stamp); background: var(--card); font-size: 1rem; }
+  .callout.care { border-left-color: var(--care); }
+  .callout.bad { border-left-color: var(--alert); }
+
+  /* Bilanz */
+  .final-h { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; margin-bottom: 18px; }
+  .final-h h1 { font-size: clamp(2.6rem, 5.5vw, 5rem); font-variation-settings: "wdth" 62; text-transform: uppercase; }
+  .final-h p { max-width: 52ch; color: var(--ink-2); font-size: 1.1rem; }
+  .totals { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 18px; }
+  .totals .t { display: flex; flex-direction: column; }
+  .totals .t b { font-family: var(--f-mono); font-size: 2.6rem; line-height: 1; }
+  .totals .t.care b { color: var(--paid); }
+  .bars { display: flex; flex-direction: column; gap: 5px; background: var(--card); border: 1px solid var(--rule-strong); padding: 14px 16px; }
+  .bars .b { display: grid; grid-template-columns: minmax(90px, 11rem) 1fr 1fr; gap: 12px; align-items: center; font-size: 0.92rem; }
+  .bars .b .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--f-mono); }
+  .bar { height: 14px; position: relative; display: flex; align-items: center; }
+  .bar i { display: block; height: 100%; border-radius: 1px; }
+  .bar span { font-family: var(--f-mono); font-size: 0.78rem; margin-left: 6px; color: var(--ink-2); white-space: nowrap; }
+  .bar.inc i { background: var(--work); }
+  .bar.care i { background: var(--care); }
+  .bars .head { font-family: var(--f-display); font-variation-settings: "wdth" 80; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+
+  .wbgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .wbcard { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .wbcard svg { width: 100%; height: auto; display: block; }
+
+  .discuss { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 36px; }
+  .questions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+  .questions li { font-size: 1.45rem; font-family: var(--f-display); font-variation-settings: "wdth" 78; font-weight: 700; line-height: 1.2; padding-left: 1.2em; position: relative; }
+  .questions li::before { content: "?"; position: absolute; left: 0; color: var(--stamp); font-family: var(--f-mono); }
+  .timeline { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--ink); }
+  .timeline li { padding: 0 0 14px 18px; position: relative; }
+  .timeline li::before { content: ""; position: absolute; left: -7px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); }
+  .timeline b { font-family: var(--f-mono); color: var(--stamp); margin-right: 8px; }
+
+  .confirm { display: inline-flex; gap: 8px; align-items: center; }
+
+  @media (max-width: 900px) {
+    .intro, .lobby, .stage, .results, .discuss { grid-template-columns: 1fr; }
+    .bars .b { grid-template-columns: 6rem 1fr; }
+    .bars .b .bar.care { grid-column: 2; }
+  }
+</style>
+</head>
+<body>
+<div class="shell" id="app">
+  <header class="masthead"><span class="brand">Die unsichtbare Uhr</span></header>
+  <main></main>
+  <footer class="dock"></footer>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="/host.js"></script>
+</body>
+</html>
