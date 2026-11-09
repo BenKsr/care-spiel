@@ -1,10 +1,18 @@
 # Die unsichtbare Uhr
 
-Ein Mehrspieler-Spiel über Care-Arbeit von 1850 bis heute, für etwa 8 bis 24 Personen und rund 60 Minuten.
+Ein Mehrspieler-Spiel über Care-Arbeit von 1850 bis heute, für etwa 8 bis 24 Personen und rund 30 Minuten. Gespielt wird mit Beamer (Spielleitung) und Handys.
 
 Jede Person verteilt pro Runde 16 wache Stunden auf Erwerbsarbeit, Care daheim, Care gegen Lohn und Erholung. Die Rangliste am Beamer zählt nur Einkommen. Die Care-Stunden werden mitgeschrieben und erst in der Bilanz gezeigt.
 
-## Ablauf
+## Ablauf (ca. 30 Minuten)
+
+1. **Prolog am Beamer (2 Min.)**: vier Folien zum Durchklicken. Einstiegsfrage, was Care-Arbeit ist, wie man spielt, und die Regel: gezählt wird nur Geld. Die Handys zeigen eine Kurzfassung und am Ende den eigenen Haushalt.
+2. **Vier Tage, je ca. 5 Min.**:
+   - *Epochen-Intro*: Szene und eine Zeitzeugin (fiktive, historisch typische Figur mit Hintergrund-Quelle). Am Handy sieht man Rolle und Haushalt.
+   - *Entscheidungsmoment*: Jede Person bekommt ein Dilemma passend zu ihrer Rolle. Die Wahl verplant Stunden fest oder verändert Geld, Care-Bedarf oder Wohlbefinden.
+   - *Stunden verteilen*: „Tag beginnen“ startet einen 90-Sekunden-Timer.
+   - *Auswertung*: Haushaltsbuch und Rangliste.
+3. **Bilanz in fünf Schritten**: offizielle Rangliste, was nicht gezählt wurde, Wohlbefinden der Haushalte, echte Zahlen (Statistik Austria, ILO), Diskussion. Am Handy bekommt jede Person eine persönliche Bilanzkarte.
 
 | Runde | Epoche | Neue Regel |
 |---|---|---|
@@ -13,7 +21,6 @@ Jede Person verteilt pro Runde 16 wache Stunden auf Erwerbsarbeit, Care daheim, 
 | 3 | 1975 · Lohn für Hausarbeit | Streik möglich, Abstimmung über Lohn für Hausarbeit |
 | 4 | 2026 · Doppelschicht und Care-Ketten | Öffentliche Kinderbetreuung, 24h-Betreuerin aus einem anderen Haushalt |
 
-Danach folgt die Bilanz in vier Schritten: offizielle Rangliste, was nicht gezählt wurde, Wohlbefinden der Haushalte, Diskussionsfragen mit Zeitleiste.
 
 **Mechanik in Kürze**
 - 5 Haushalte in Wiener Bezirken, unterschiedlich wohlhabend. Rollen rotieren jede Runde.
@@ -49,7 +56,8 @@ Für ein Spiel im Kurs muss die App online sein, damit alle Handys sie erreichen
 
 ## Dateien
 
-- `game.js` – Epochen, Rollen, Ereignisse, Auswertung. Hier lassen sich Löhne, Texte und Regeln anpassen.
+- `story.js` – alle Erzähltexte: Prolog, Szenen, Zeitzeuginnen, Entscheidungsmomente, echte Zahlen mit Quellen. Hier lassen sich Texte ohne Programmierkenntnisse ändern.
+- `game.js` – Epochen, Rollen, Ereignisse, Auswertung. Hier lassen sich Löhne und Regeln anpassen.
 - `server.js` – Webserver und Echtzeitverbindung (Socket.IO)
 - `public/index.html`, `public/player.js` – Handy-Ansicht
 - `public/leitung.html`, `public/host.js` – Spielleitung
@@ -57,7 +65,7 @@ Für ein Spiel im Kurs muss die App online sein, damit alle Handys sie erreichen
 
 ## Tipps für die Spielleitung
 
-- Pro Runde reichen 2–3 Minuten zum Verteilen. Mit den Timer-Knöpfen läuft am Handy ein Countdown mit.
+- Die Zeitzeugin kurz vorlesen, dann „Tag beginnen · 90 Sek.“ drücken. Am Handy läuft der Countdown mit.
 - Wer die Karte nicht abgibt, spielt mit dem aktuellen Entwurf.
 - Nach jeder Runde kurz auf die Tabelle zeigen: Wo fehlt Care, wer hat gekauft, wer steht oben auf der Rangliste?
 - Lade die Leitungsseite nicht in einem privaten Fenster, sonst geht nach einem Neuladen die Spielleitung verloren.

@@ -14,6 +14,8 @@
   let strike = false;
   let vote = null;
   let draftKey = null;  // Runde, für die der Entwurf gilt
+  let lastChoice = null;
+  let changingChoice = false;
   let joinError = '';
   let timerHandle = null;
 
@@ -54,6 +56,12 @@
       draft = Object.assign({}, s.me.draft);
       strike = !!s.me.strike;
       vote = s.me.vote;
+      lastChoice = s.me.choice;
+      changingChoice = false;
+    } else if (s.phase === 'play' && s.me.choice !== lastChoice) {
+      lastChoice = s.me.choice;
+      draft = Object.assign({}, s.me.draft);
+      changingChoice = false;
     }
     render();
   });
@@ -98,7 +106,7 @@
 
   function topbar() {
     const s = state;
-    const r = s.round >= 0 ? `Tag ${s.round + 1}/${s.rounds}` : 'Wartesaal';
+    const r = s.phase === 'prolog' ? 'Prolog' : s.phase === 'final' ? 'Bilanz' : s.round >= 0 ? `Tag ${s.round + 1}/${s.rounds}` : 'Wartesaal';
     return `<header class="topbar"><span class="brand">Die unsichtbare Uhr</span><span class="who">${esc(s.me.name)} · ${r} · ${esc(s.code)}</span></header>`;
   }
 
@@ -123,11 +131,12 @@
       </section>`;
   }
 
-  function cellsHTML(a, isStrike) {
+  function cellsHTML(a, isStrike, lock) {
     let out = '';
-    const rest = state.hours - a.E - a.C - a.B;
+    const ln = lock && !isStrike ? lock.n : 0;
+    const rest = state.hours - ln - a.E - a.C - a.B;
     const seq = isStrike ? Array(state.hours).fill('S') :
-      [].concat(Array(a.E).fill('E'), Array(a.C).fill('C'), Array(a.B).fill('B'), Array(Math.max(0, rest)).fill('R'));
+      [].concat(Array(ln).fill(lock ? lock.kind + ' lock' : ''), Array(a.E).fill('E'), Array(a.C).fill('C'), Array(a.B).fill('B'), Array(Math.max(0, rest)).fill('R'));
     seq.forEach((k) => { out += `<span class="cell ${k}"></span>`; });
     let scale = '';
     for (let i = 0; i < state.hours; i++) scale += `<span>${(6 + i) % 24}</span>`;
@@ -138,15 +147,63 @@
     const total = draft.E + draft.C + draft.B;
     const v = draft[key];
     const locked = state.me.submitted || strike;
+    const cap = state.budget;
     return `
       <div class="row">
         <div class="what"><b><span class="swatch ${key}"></span>${title}</b><small>${sub}</small></div>
         <div class="stepper">
           <button type="button" data-step="${key}" data-d="-1" aria-label="${title}: eine Stunde weniger" ${locked || v <= 0 ? 'disabled' : ''}>−</button>
           <output aria-label="${title} in Stunden">${v}</output>
-          <button type="button" data-step="${key}" data-d="1" aria-label="${title}: eine Stunde mehr" ${locked || v >= max || total >= state.hours ? 'disabled' : ''}>+</button>
+          <button type="button" data-step="${key}" data-d="1" aria-label="${title}: eine Stunde mehr" ${locked || v >= max || total >= cap ? 'disabled' : ''}>+</button>
         </div>
       </div>`;
+  }
+
+  function effectHint(e) {
+    if (!e) return '';
+    const bits = [];
+    if (e.hours) bits.push(`${e.hours.n} Std. ${({ E: 'Arbeit, bezahlt', C: 'Care daheim, unbezahlt', O: 'Care für andere, unbezahlt', F: 'unbezahlt' })[e.hours.kind]}`);
+    if (e.money) bits.push(`${e.money > 0 ? '+' : '−'}${Math.abs(e.money)} Geld`);
+    if (e.need) bits.push(`+${e.need} Std. Bedarf daheim`);
+    if (e.wb) bits.push(`Wohlbefinden ${e.wb > 0 ? '+' : '−'}${Math.abs(e.wb)}`);
+    if (e.tired) bits.push('morgen erschöpft');
+    return bits.length ? `<small class="eff">${bits.map(esc).join(' · ')}</small>` : '';
+  }
+
+  function renderProlog() {
+    const P = state.prolog;
+    const dots = Array.from({ length: state.prologCount }, (_, i) => `<i class="${i === state.prologStep ? 'on' : ''}"></i>`).join('');
+    const last = state.prologStep >= state.prologCount - 1;
+    app.innerHTML = `
+      ${topbar()}
+      <section class="card wait prolog-card">
+        <span class="label">Schau nach vorne</span>
+        <h2>${esc(P.title)}</h2>
+        <p>${esc(P.short)}</p>
+        ${P.legend ? `<div class="legend" style="justify-content:center"><span><span class="swatch E"></span>Erwerb</span><span><span class="swatch C"></span>Care daheim</span><span><span class="swatch R"></span>Erholung</span></div>` : ''}
+        <div class="dots" aria-hidden="true">${dots}</div>
+      </section>
+      ${last && state.household ? `<p class="label" style="text-align:center">Das ist dein Haushalt für alle vier Tage</p>${householdCard(false)}` : ''}`;
+  }
+
+  function renderEpochIntro() {
+    const e = state.epoch;
+    const role = state.role;
+    const first = (e.scene || '').split(/(?<=\.)\s/)[0];
+    app.innerHTML = `
+      ${topbar()}
+      ${epochBand()}
+      <p class="sceneline">${esc(first)}</p>
+      <section class="card role">
+        <span class="label">Heute bist du</span>
+        <h3>${esc(role.name)}</h3>
+        <p>${esc(role.desc)}</p>
+      </section>
+      ${householdCard(true)}
+      <section class="card wait" style="padding:16px">
+        <span class="label">Schau nach vorne</span>
+        <p>Gleich triffst du eine Entscheidung und verteilst deinen Tag.</p>
+      </section>`;
   }
 
   function renderPlay() {
@@ -154,8 +211,41 @@
     const role = s.role;
     const mult = s.household ? s.household.mult : 1;
     const wage = fmt(role.wage * mult);
-    const rest = s.hours - draft.E - draft.C - draft.B;
+    const rest = s.budget - draft.E - draft.C - draft.B;
     const ep = s.epoch;
+    const dil = role.dilemma;
+    const needChoice = dil && (s.me.choice === null || changingChoice) && !s.me.submitted;
+    const roleCard = `
+      <section class="card role">
+        <span class="label">Deine Rolle heute</span>
+        <h3>${esc(role.name)}</h3>
+        <p>${esc(role.desc)}</p>
+        ${s.me.exhausted ? `<span class="stamp-mark" style="color:var(--alert);border-color:var(--alert)">erschöpft</span>` : ''}
+      </section>`;
+
+    if (needChoice) {
+      app.innerHTML = `
+        ${topbar()}
+        ${epochBand()}
+        ${roleCard}
+        <section class="card dilemma">
+          <span class="label">Entscheidung · zuerst</span>
+          <h3>${esc(dil.q)}</h3>
+          <div class="opts">${dil.options.map((o, i) => `<button type="button" class="btn ${s.me.choice === i ? '' : 'ghost'} block" data-choice="${i}">${esc(o.label)}${effectHint(o.effect)}</button>`).join('')}</div>
+          <p class="hint">Danach verteilst du deine übrigen Stunden.</p>
+        </section>
+        ${householdCard(true)}`;
+      startTimer();
+      return;
+    }
+    const chosen = dil && s.me.choice !== null ? dil.options[s.me.choice] : null;
+    const choiceCard = chosen ? `
+      <section class="card chosen">
+        <span class="label">Deine Entscheidung</span>
+        <p><b>${esc(chosen.label)}.</b> ${esc(chosen.text)}</p>
+        ${s.lock ? `<p class="lockline"><span class="swatch ${s.lock.kind}"></span>${s.lock.n} Std. fest verplant: ${esc(s.lock.label)}</p>` : ''}
+        ${s.me.submitted ? '' : '<button class="btn ghost small" type="button" id="rechoose">Anders entscheiden</button>'}
+      </section>` : '';
 
     const facts = [];
     if (role.maxE > 0) facts.push(`Lohn ${wage} / Std.`);
@@ -202,13 +292,14 @@
         <div class="facts">${facts.map((f) => `<span>${esc(f)}</span>`).join('')}</div>
         ${s.me.exhausted ? `<span class="stamp-mark" style="color:var(--alert);border-color:var(--alert)">erschöpft</span>` : ''}
       </section>
+      ${choiceCard}
       ${s.me.exhausted ? `<p class="warn">Du hast gestern zu wenig Erholung gehabt. Heute schaffst du nur drei Viertel.</p>` : ''}
       ${householdCard(true)}
       ${choice}
       <section class="card planner">
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><span class="label">Dein Tag · 6 bis 22 Uhr</span>${timer}</div>
-        ${cellsHTML(draft, strike)}
-        <div class="legend"><span><span class="swatch E"></span>Erwerb</span><span><span class="swatch C"></span>Care daheim</span>${role.canB ? '<span><span class="swatch B"></span>Care gegen Lohn</span>' : ''}<span><span class="swatch R"></span>Erholung</span></div>
+        ${cellsHTML(draft, strike, s.lock)}
+        <div class="legend">${s.lock && !strike ? `<span><span class="swatch ${s.lock.kind} lockmark"></span>Fest verplant</span>` : ''}<span><span class="swatch E"></span>Erwerb</span><span><span class="swatch C"></span>Care daheim</span>${role.canB ? '<span><span class="swatch B"></span>Care gegen Lohn</span>' : ''}<span><span class="swatch R"></span>Erholung</span></div>
         ${strike ? `<p class="note" style="border:0;padding:0">Du streikst. Alle 16 Stunden bleiben heute liegen.</p>` : `
         <div class="rows">
           ${rows}
@@ -235,6 +326,9 @@
     if (!r) return renderWait('Auswertung', 'Schau nach vorne.');
     const me = r.me, h = r.household;
     const notes = [];
+    if (me.choiceLabel) notes.push(`<b>${esc(me.choiceLabel)}:</b> ${esc(me.choiceText)}`);
+    else if (me.dilemma) notes.push('Du hast heute keine Entscheidung getroffen.');
+    if (me.O) notes.push(`${me.O} Stunden hast du für Menschen außerhalb deines Haushalts gesorgt. Das zählt nirgends.`);
     if (me.strike) notes.push('Du hast gestreikt. Dein Haushalt musste ohne dich auskommen.');
     if (me.B > 0) notes.push(me.Bsold > 0 ? `Haushalt ${esc(me.buyer)} hat ${me.Bsold} deiner Stunden gekauft.` : 'Niemand hat deine Care-Stunden gekauft. Dafür gab es kein Geld.');
     if (me.B > 0 && me.Bsold < me.B && me.Bsold > 0) notes.push(`${me.B - me.Bsold} Stunden blieben unbezahlt.`);
@@ -250,10 +344,12 @@
       <section class="card result">
         <span class="label">Dein Einkommen heute</span>
         <span class="big">${fmt(me.income)}</span>
-        ${cellsHTML({ E: me.E, C: me.C, B: me.B }, me.strike)}
+        ${cellsHTML({ E: me.E - (me.lock && me.lock.kind === 'E' ? me.lock.n : 0), C: me.C - (me.lock && me.lock.kind === 'C' ? me.lock.n : 0), B: me.B }, me.strike, me.lock)}
         <div class="kv">
           <span>Erwerbsarbeit</span><span>${me.E} Std.</span>
           <span>Care daheim</span><span>${me.C} Std.</span>
+          ${me.O ? `<span>Care für andere</span><span>${me.O} Std.</span>` : ''}
+          ${me.F ? `<span>Anderes Unbezahltes</span><span>${me.F} Std.</span>` : ''}
           ${me.B ? `<span>Care gegen Lohn</span><span>${me.Bsold}/${me.B} Std.</span>` : ''}
           <span>Erholung</span><span>${me.R} Std.</span>
           ${me.tax ? `<span>Steuer</span><span>−${fmt(me.tax)}</span>` : ''}
@@ -268,19 +364,39 @@
   function renderFinal() {
     const t = state.me.totals;
     if (state.finalStep < 1 || !t) return renderWait('Die Bilanz', 'Schau auf den Beamer.');
+    const me = state.me;
+    const all = 16 * state.rounds;
+    const seg = (n, cls) => n > 0 ? `<i class="${cls}" style="flex:${n}"></i>` : '';
+    const other = Math.max(0, all - t.work - t.care - t.paidCare - t.rest);
+    const choices = (me.choices || []).map((c) => `<li><b>${esc(c.year)}</b> ${esc(c.label)}</li>`).join('');
     app.innerHTML = `
       ${topbar()}
-      <section class="card result">
-        <span class="label">Deine vier Tage</span>
+      <section class="card bilanz">
+        <span class="label">Deine persönliche Bilanz</span>
+        <p class="headline">Für <b>${t.care}</b> deiner Stunden hat dich niemand bezahlt.</p>
+        <div class="stack" aria-label="Deine ${all} Stunden">${seg(t.work, 'E')}${seg(t.paidCare, 'B')}${seg(t.care, 'C')}${seg(other, 'F')}${seg(t.rest, 'R')}</div>
         <div class="kv">
           <span>Einkommen gesamt</span><span>${fmt(t.income)}</span>
+          <span>Platz auf der Rangliste</span><span>${me.rank} von ${me.players}</span>
+          <span>Platz bei unbezahlter Care</span><span>${me.careRank} von ${me.players}</span>
           <span>Erwerbsarbeit</span><span>${t.work} Std.</span>
-          <span>Unbezahlte Care</span><span>${t.care} Std.</span>
           <span>Bezahlte Care</span><span>${t.paidCare} Std.</span>
+          <span>Unbezahlte Care</span><span>${t.care} Std.</span>
+          ${t.careOthers ? `<span>davon für andere Haushalte</span><span>${t.careOthers} Std.</span>` : ''}
           <span>Erholung</span><span>${t.rest} Std.</span>
         </div>
         <p class="note">Die Rangliste hat nur die erste Zeile gesehen.</p>
       </section>
+      <section class="card bilanz">
+        <span class="label">Wer für dich gesorgt hat</span>
+        <div class="kv">
+          <span>Andere in deinem Haushalt</span><span>${t.received} Std.</span>
+          <span>Zugekauft</span><span>${t.bought} Std.</span>
+          <span>Öffentliche Betreuung</span><span>${t.public} Std.</span>
+        </div>
+        <p class="note">Die zugekauften Stunden hat jemand geleistet, dem dann zu Hause die Zeit gefehlt hat.</p>
+      </section>
+      ${choices ? `<section class="card bilanz"><span class="label">Deine Entscheidungen</span><ul class="choices">${choices}</ul></section>` : ''}
       <p class="label" style="text-align:center">Danke fürs Mitspielen</p>`;
   }
 
@@ -298,6 +414,8 @@
   function render() {
     if (!state) return renderJoin();
     if (state.phase === 'lobby') return renderWait('Du bist dabei', 'Sobald alle da sind, teilt die Spielleitung euch in Haushalte ein.');
+    if (state.phase === 'prolog') return renderProlog();
+    if (state.phase === 'intro') return renderEpochIntro();
     if (state.phase === 'play') return renderPlay();
     if (state.phase === 'result') return renderResult();
     if (state.phase === 'final') return renderFinal();
@@ -314,13 +432,23 @@
   app.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b || !state) return;
-    if (b.dataset.step) {
+    if (b.dataset.choice !== undefined) {
+      const c = Number(b.dataset.choice);
+      if (c === state.me.choice) { changingChoice = false; renderPlay(); return; }
+      b.disabled = true;
+      socket.emit('player:choice', { choice: c }, (res) => {
+        if (!res || !res.ok) { toast((res && res.error) || 'Hat nicht geklappt.'); b.disabled = false; }
+      });
+    } else if (b.id === 'rechoose') {
+      changingChoice = true;
+      renderPlay();
+    } else if (b.dataset.step) {
       const k = b.dataset.step, d = Number(b.dataset.d);
       const role = state.role;
       const max = k === 'E' ? role.maxE : k === 'C' ? role.maxC : 16;
       const total = draft.E + draft.C + draft.B;
       const next = draft[k] + d;
-      if (next < 0 || next > max || (d > 0 && total >= state.hours)) return;
+      if (next < 0 || next > max || (d > 0 && total >= state.budget)) return;
       draft[k] = next;
       sendDraft();
       renderPlay();

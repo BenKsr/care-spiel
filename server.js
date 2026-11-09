@@ -74,6 +74,15 @@ io.on('connection', (socket) => {
           if (!g.order.length) return cb && cb({ ok: false, error: 'Noch niemand ist beigetreten.' });
           G.startGame(g);
           break;
+        case 'prolog':
+          if (g.phase === 'prolog') g.prologStep = Math.max(0, Math.min(G.PROLOG.length - 1, Number(value) || 0));
+          break;
+        case 'rounds':
+          if (g.phase === 'prolog') G.startRounds(g);
+          break;
+        case 'begin':
+          if (g.phase === 'intro') G.beginPlay(g, Number(value) || 0);
+          break;
         case 'resolve':
           if (g.phase === 'play') G.resolveRound(g);
           break;
@@ -81,7 +90,7 @@ io.on('connection', (socket) => {
           if (g.phase === 'result') G.nextRound(g);
           break;
         case 'finalStep':
-          if (g.phase === 'final') g.finalStep = Math.max(0, Math.min(3, Number(value) || 0));
+          if (g.phase === 'final') g.finalStep = Math.max(0, Math.min(4, Number(value) || 0));
           break;
         case 'timer':
           if (g.phase === 'play') g.timerEnd = value ? Date.now() + Number(value) * 1000 : null;
@@ -129,9 +138,18 @@ io.on('connection', (socket) => {
     const p = g && g.players[bound.playerId];
     if (!p || g.phase !== 'play') return;
     const role = G.roleFor(g, p);
-    if (alloc) p.draft = G.sanitize(alloc, role);
+    if (alloc) p.draft = G.sanitize(alloc, role, G.budgetFor(g, p));
     if (typeof strike === 'boolean') p.strike = strike;
     if (vote === true || vote === false || vote === null) p.vote = vote;
+  });
+
+  socket.on('player:choice', ({ choice } = {}, cb) => {
+    if (!bound) return cb && cb({ ok: false });
+    const g = games.get(bound.code);
+    const p = g && g.players[bound.playerId];
+    if (!p || !G.setChoice(g, p, choice)) return cb && cb({ ok: false, error: 'Die Entscheidung ist nicht mehr möglich.' });
+    cb && cb({ ok: true });
+    push(g);
   });
 
   socket.on('player:submit', ({ alloc, strike, vote, submitted } = {}, cb) => {
@@ -140,9 +158,10 @@ io.on('connection', (socket) => {
     const p = g && g.players[bound.playerId];
     if (!p || g.phase !== 'play') return cb && cb({ ok: false, error: 'Die Runde ist schon geschlossen.' });
     const role = G.roleFor(g, p);
-    if (alloc) p.draft = G.sanitize(alloc, role);
+    if (alloc) p.draft = G.sanitize(alloc, role, G.budgetFor(g, p));
     if (typeof strike === 'boolean') p.strike = strike;
     if (vote === true || vote === false || vote === null) p.vote = vote;
+    if (submitted !== false && role.dilemma && p.choice === null) return cb && cb({ ok: false, error: 'Bitte triff zuerst deine Entscheidung.' });
     p.submitted = submitted !== false;
     cb && cb({ ok: true });
     push(g);

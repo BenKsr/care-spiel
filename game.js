@@ -7,6 +7,8 @@
  * aber erst am Ende gezeigt.
  */
 
+const { PROLOG, STORY, FACTS } = require('./story');
+
 const HOURS = 16;
 const EXHAUSTION_LIMIT = 4; // weniger Erholung als das -> nächste Runde erschöpft
 
@@ -130,6 +132,13 @@ const EPOCHS = [
   }
 ];
 
+EPOCHS.forEach((ep) => {
+  const st = STORY[ep.id];
+  ep.scene = st.scene;
+  ep.witness = st.witness;
+  ep.roles.forEach((r, i) => { r.dilemma = st.dilemmas[i]; });
+});
+
 const HOUSEHOLDS = [
   { name: 'Hietzing', mult: 1.5 },
   { name: 'Ottakring', mult: 0.75 },
@@ -162,7 +171,8 @@ function createGame(code, hostKey) {
   return {
     code,
     hostKey,
-    phase: 'lobby', // lobby | play | result | final
+    phase: 'lobby', // lobby | prolog | intro | play | result | final
+    prologStep: 0,
     round: -1,
     players: {},
     order: [],
@@ -188,11 +198,13 @@ function addPlayer(g, id, name) {
     seat: 0,
     connected: true,
     draft: { E: 8, C: 4, B: 0 },
+    choice: null,
     submitted: false,
     strike: false,
     vote: null,
     exhausted: false,
-    totals: { income: 0, work: 0, care: 0, paidCare: 0, rest: 0, careValue: 0 },
+    totals: { income: 0, work: 0, care: 0, paidCare: 0, rest: 0, careValue: 0, careOthers: 0, received: 0, bought: 0, public: 0 },
+    choices: [],
     rounds: []
   };
   g.players[id] = p;
@@ -203,7 +215,7 @@ function addPlayer(g, id, name) {
     p.household = hh.id;
     p.seat = hh.members.length;
     hh.members.push(id);
-    if (g.phase === 'play') preparePlayer(g, p);
+    if (g.phase === 'play' || g.phase === 'intro') preparePlayer(g, p);
   }
   return p;
 }
@@ -224,19 +236,37 @@ function roleFor(g, p) {
   return ep.roles[(p.seat + g.round) % ep.roles.length];
 }
 
-function defaultDraft(role) {
-  const B = role.canB ? 9 : 0;
-  const E = Math.min(role.maxE, 8);
-  const C = Math.min(role.maxC, Math.max(0, Math.min(4, HOURS - B - E - 3)));
-  return sanitize({ E, C, B }, role);
+function choiceEffect(role, choice) {
+  if (!role || !role.dilemma || (choice !== 0 && choice !== 1)) return null;
+  return role.dilemma.options[choice].effect || {};
 }
 
-function sanitize(a, role) {
+function lockFor(g, p) {
+  const eff = choiceEffect(roleFor(g, p), p.choice);
+  return eff && eff.hours ? eff.hours : null;
+}
+
+function budgetFor(g, p) {
+  const lock = lockFor(g, p);
+  return HOURS - (lock ? lock.n : 0);
+}
+
+function defaultDraft(role, budget) {
+  // Startvorschlag: 4 Std. Erholung bleiben frei, damit niemand ungewollt erschöpft ist
+  const free = Math.max(0, budget - EXHAUSTION_LIMIT);
+  const B = role.canB ? Math.max(0, Math.min(8, free - 2)) : 0;
+  const E = Math.min(role.maxE, Math.max(0, free - B - 4));
+  const C = Math.min(role.maxC, Math.max(0, free - B - E));
+  return sanitize({ E, C, B }, role, budget);
+}
+
+function sanitize(a, role, budget) {
+  const H = budget == null ? HOURS : budget;
   const toInt = (v) => Math.max(0, Math.floor(Number(v) || 0));
   let E = Math.min(toInt(a && a.E), role.maxE);
   let C = Math.min(toInt(a && a.C), role.maxC);
   let B = role.canB ? toInt(a && a.B) : 0;
-  let over = E + C + B - HOURS;
+  let over = E + C + B - H;
   if (over > 0) { const d = Math.min(B, over); B -= d; over -= d; }
   if (over > 0) { const d = Math.min(E, over); E -= d; over -= d; }
   if (over > 0) { const d = Math.min(C, over); C -= d; over -= d; }
@@ -244,6 +274,12 @@ function sanitize(a, role) {
 }
 
 function startGame(g) {
+  formHouseholds(g);
+  g.phase = 'prolog';
+  g.prologStep = 0;
+}
+
+function formHouseholds(g) {
   const ids = shuffle(g.order);
   const n = ids.length;
   const H = Math.max(1, Math.min(HOUSEHOLDS.length, Math.round(n / 4)));
@@ -266,13 +302,17 @@ function startGame(g) {
     p.seat = hh.members.length;
     hh.members.push(id);
   });
+}
+
+function startRounds(g) {
   g.round = 0;
   beginRound(g);
 }
 
 function preparePlayer(g, p) {
   const role = roleFor(g, p);
-  p.draft = defaultDraft(role);
+  p.choice = null;
+  p.draft = defaultDraft(role, HOURS);
   p.submitted = false;
   p.strike = false;
   if (EPOCHS[g.round].vote) p.vote = null;
@@ -286,8 +326,20 @@ function beginRound(g) {
     hh.need = Math.round(3.5 * Math.max(1, hh.members.length)) + hh.event.hours;
   });
   g.order.forEach((id) => preparePlayer(g, g.players[id]));
-  g.phase = 'play';
+  g.phase = 'intro';
   g.timerEnd = null;
+}
+
+function beginPlay(g, seconds) {
+  g.phase = 'play';
+  g.timerEnd = seconds ? Date.now() + seconds * 1000 : null;
+}
+
+function setChoice(g, p, choice) {
+  if (g.phase !== 'play' || p.submitted) return false;
+  p.choice = choice === 0 || choice === 1 ? choice : null;
+  p.draft = defaultDraft(roleFor(g, p), budgetFor(g, p));
+  return true;
 }
 
 function resolveRound(g) {
@@ -311,14 +363,23 @@ function resolveRound(g) {
     if (p.household === null) return;
     const hh = g.households[p.household];
     const role = roleFor(g, p);
-    const a = sanitize(p.draft, role);
+    const a = sanitize(p.draft, role, budgetFor(g, p));
+    const eff = choiceEffect(role, p.choice) || {};
+    const lock = eff.hours || null;
     const strike = !!(ep.strike && p.strike);
+    let O = 0, F = 0, lockE = 0;
     if (strike) { a.E = 0; a.C = 0; a.B = 0; res.strikers++; }
-    const R = HOURS - a.E - a.C - a.B;
+    else if (lock) {
+      if (lock.kind === 'E') { a.E += lock.n; lockE = lock.n; }
+      else if (lock.kind === 'C') a.C += lock.n;
+      else if (lock.kind === 'O') O = lock.n;
+      else F = lock.n;
+    }
+    const R = HOURS - a.E - a.C - a.B - O - F;
     const prod = (0.4 + 0.6 * hh.wb / 100) * (p.exhausted ? 0.75 : 1);
     const wage = role.wage * hh.mult;
     const incomeE = a.E * wage * prod;
-    let income = incomeE;
+    let income = incomeE + (eff.money || 0);
     if (ep.careProd) income += a.C * role.wage * hh.mult * ep.careProd * prod;
     let tax = 0;
     let carePay = 0;
@@ -331,7 +392,15 @@ function resolveRound(g) {
       name: p.name,
       household: hh.id,
       role: role.name,
-      E: a.E, C: a.C, B: a.B, R,
+      E: a.E, C: a.C, B: a.B, O, F, R, lockE,
+      lock: strike ? null : lock,
+      choice: p.choice,
+      dilemma: role.dilemma ? role.dilemma.q : null,
+      choiceLabel: role.dilemma && p.choice !== null ? role.dilemma.options[p.choice].label : null,
+      choiceText: role.dilemma && p.choice !== null ? role.dilemma.options[p.choice].text : null,
+      effWb: eff.wb || 0,
+      effNeed: eff.need || 0,
+      tired: !!eff.tired,
       Bsold: 0,
       buyer: null,
       strike,
@@ -347,7 +416,10 @@ function resolveRound(g) {
     if (a.B > 0) res.pool += a.B;
   });
 
-  // 2) Haushalte: eigener Bedarf
+  // 2) Haushalte: eigener Bedarf (Entscheidungen können ihn erhöhen)
+  g.households.forEach((hh) => {
+    hh.need += hh.members.reduce((s, id) => s + (res.players[id] ? res.players[id].effNeed : 0), 0);
+  });
   g.households.forEach((hh) => {
     const own = hh.members.reduce((s, id) => s + (res.players[id] ? res.players[id].C : 0), 0);
     res.households[hh.id] = {
@@ -403,6 +475,7 @@ function resolveRound(g) {
     const h = res.households[hh.id];
     if (h.deficit > 0) hh.wb -= h.deficit * 4;
     else hh.wb += 5 + Math.min(10, h.surplus * 2);
+    hh.wb += hh.members.reduce((s, id) => s + (res.players[id] ? res.players[id].effWb : 0), 0);
     hh.wb = Math.max(0, Math.min(100, Math.round(hh.wb)));
     hh.wbLog.push(hh.wb);
     hh.kasse = r1(hh.kasse);
@@ -419,10 +492,18 @@ function resolveRound(g) {
     const paid = pr.Bsold + (pr.eIsCare ? pr.E : 0);
     p.totals.income = r1(p.totals.income + pr.income);
     p.totals.work += pr.E;
-    p.totals.care += pr.C;
+    p.totals.care += pr.C + pr.O;
+    p.totals.careOthers += pr.O;
     p.totals.paidCare += paid;
     p.totals.rest += pr.R;
-    p.exhausted = pr.R < EXHAUSTION_LIMIT;
+    const hres = res.households[pr.household];
+    if (hres) {
+      p.totals.received += Math.max(0, hres.own - pr.C);
+      p.totals.bought += hres.bought;
+      p.totals.public += hres.public;
+    }
+    if (pr.choiceLabel) p.choices.push({ year: ep.year, q: pr.dilemma, label: pr.choiceLabel });
+    p.exhausted = pr.R < EXHAUSTION_LIMIT || pr.tired;
     pr.nowExhausted = p.exhausted;
     p.rounds.push(pr);
   });
@@ -463,6 +544,7 @@ function epochPublic(ep) {
   return {
     id: ep.id, year: ep.year, title: ep.title, place: ep.place,
     history: ep.history, rule: ep.rule, strike: !!ep.strike, vote: !!ep.vote,
+    scene: ep.scene, witness: ep.witness,
     market: ep.market, publicCare: ep.publicCare, careProd: ep.careProd
   };
 }
@@ -483,13 +565,17 @@ function hostView(g) {
     phase: g.phase,
     round: g.round,
     rounds: EPOCHS.length,
+    prolog: PROLOG,
+    prologStep: g.prologStep,
+    facts: FACTS,
     epoch: epochPublic(ep),
     epochs: EPOCHS.map(epochPublic),
     players: g.order.map((id) => {
       const p = g.players[id];
       return {
         id, name: p.name, household: p.household, connected: p.connected,
-        submitted: p.submitted, role: g.round >= 0 && p.household !== null ? roleFor(g, p).name : null,
+        submitted: p.submitted, chose: p.choice !== null,
+        role: g.round >= 0 && p.household !== null ? roleFor(g, p).name : null,
         totals: p.totals, rounds: p.rounds
       };
     }),
@@ -501,6 +587,11 @@ function hostView(g) {
     finalStep: g.finalStep,
     timerEnd: g.timerEnd
   };
+}
+
+function rankOf(g, p, key) {
+  const sorted = g.order.map((id) => g.players[id]).sort((a, b) => b.totals[key] - a.totals[key]);
+  return sorted.indexOf(p) + 1;
 }
 
 function playerView(g, id) {
@@ -516,13 +607,22 @@ function playerView(g, id) {
     round: g.round,
     rounds: EPOCHS.length,
     hours: HOURS,
+    budget: role ? budgetFor(g, p) : HOURS,
+    lock: role ? lockFor(g, p) : null,
     exhaustionLimit: EXHAUSTION_LIMIT,
+    prolog: g.phase === 'prolog' ? PROLOG[g.prologStep] : null,
+    prologStep: g.prologStep,
+    prologCount: PROLOG.length,
     epoch: epochPublic(ep),
     wagesForHousework: g.wagesForHousework && g.round === 3,
     me: {
-      id: p.id, name: p.name, draft: p.draft, submitted: p.submitted,
+      id: p.id, name: p.name, draft: p.draft, submitted: p.submitted, choice: p.choice,
       strike: p.strike, vote: p.vote, exhausted: p.exhausted,
-      totals: g.phase === 'final' ? p.totals : undefined
+      totals: g.phase === 'final' ? p.totals : undefined,
+      choices: g.phase === 'final' ? p.choices : undefined,
+      rank: g.phase === 'final' ? rankOf(g, p, 'income') : undefined,
+      careRank: g.phase === 'final' ? rankOf(g, p, 'care') : undefined,
+      players: g.order.length
     },
     role,
     household: hh ? householdPublic(g, hh) : null,
@@ -535,6 +635,6 @@ function playerView(g, id) {
 }
 
 module.exports = {
-  EPOCHS, HOURS, createGame, addPlayer, removePlayer, startGame, resolveRound,
-  nextRound, sanitize, roleFor, hostView, playerView
+  EPOCHS, HOURS, PROLOG, createGame, addPlayer, removePlayer, startGame, startRounds, beginPlay,
+  setChoice, resolveRound, nextRound, sanitize, roleFor, budgetFor, hostView, playerView
 };

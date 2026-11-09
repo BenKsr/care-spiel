@@ -51,7 +51,7 @@
 
   function masthead() {
     if (!S) { mast.innerHTML = `<span class="brand">Die unsichtbare Uhr</span><span class="label">Spielleitung</span>`; return; }
-    const day = S.round >= 0 && S.phase !== 'final' ? `Tag ${S.round + 1} von ${S.rounds}` : S.phase === 'final' ? 'Bilanz' : 'Wartesaal';
+    const day = S.phase === 'prolog' ? 'Prolog' : S.round >= 0 && S.phase !== 'final' ? `Tag ${S.round + 1} von ${S.rounds}` : S.phase === 'final' ? 'Bilanz' : 'Wartesaal';
     mast.innerHTML = `
       <span class="brand">Die unsichtbare Uhr</span>
       <span class="meta"><span>${day}</span><span>${S.players.length} dabei</span><span>Code <span class="code">${esc(S.code)}</span></span></span>`;
@@ -103,7 +103,7 @@
         </div>
         ${clockSVG()}
       </section>`;
-    dock.innerHTML = `<div class="left"><span class="label">Für 8 bis 24 Personen · etwa 60 Minuten</span></div>
+    dock.innerHTML = `<div class="left"><span class="label">Für 8 bis 24 Personen · etwa 30 Minuten</span></div>
       <div class="right"><button class="btn stamp" id="create">Neues Spiel anlegen</button></div>`;
   }
 
@@ -131,7 +131,7 @@
     } else qrEl.hidden = true;
     dock.innerHTML = `
       <div class="left">${endControl()}</div>
-      <div class="right"><button class="btn stamp" id="start" ${S.players.length ? '' : 'disabled'}>Haushalte bilden und starten</button></div>`;
+      <div class="right"><button class="btn stamp" id="start" ${S.players.length ? '' : 'disabled'}>Haushalte bilden und Prolog starten</button></div>`;
   }
 
   function hhCards(withSubmit) {
@@ -151,16 +151,73 @@
     }).join('')}</div>`;
   }
 
+  function timelineHTML(active) {
+    return `<ol class="eras">${S.epochs.map((e, i) => `<li class="${i === active ? 'on' : i < active ? 'past' : ''}"><b>${esc(e.year)}</b><span>${esc(e.title)}</span></li>`).join('')}</ol>`;
+  }
+
+  function renderProlog() {
+    const step = S.prologStep;
+    const P = S.prolog[step];
+    let extra = '';
+    if (P.items) extra = `<ul class="careitems">${P.items.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`;
+    if (P.legend) extra = `<div class="daydemo">
+        <div class="hours demo-cells">${'EEEEEEEECCCCRRRR'.split('').map((k) => `<span class="cell ${k}"></span>`).join('')}</div>
+        <div class="demo-legend"><span><span class="swatch E"></span>Erwerbsarbeit · bringt Geld</span><span><span class="swatch C"></span>Care daheim · bringt kein Geld</span><span><span class="swatch B"></span>Care gegen Lohn · nur in manchen Epochen</span><span><span class="swatch R"></span>Erholung · unter 4 Std. erschöpft</span></div>
+      </div>`;
+    if (P.timeline) extra = timelineHTML(-1);
+    main.innerHTML = `
+      <section class="prolog">
+        <div class="pro-text">
+          <span class="label">${esc(P.kicker)} · ${step + 1} / ${S.prolog.length}</span>
+          <h1>${esc(P.title)}</h1>
+          ${P.body.map((b) => `<p>${esc(b)}</p>`).join('')}
+        </div>
+        <div class="pro-extra">${extra || clockSVG()}</div>
+      </section>`;
+    const last = step >= S.prolog.length - 1;
+    dock.innerHTML = `
+      <div class="left">${step > 0 ? `<button class="btn ghost small" data-prolog="${step - 1}">Zurück</button>` : ''}<span class="label">Prolog</span></div>
+      <div class="right">${endControl()}${last ? `<button class="btn stamp" id="rounds">Los geht's: ${esc(S.epochs[0].year)}</button>` : `<button class="btn stamp" data-prolog="${step + 1}">Weiter</button>`}</div>`;
+  }
+
+  function renderEpochIntro() {
+    const e = S.epoch;
+    const w = e.witness;
+    main.innerHTML = `
+      <section class="epintro">
+        <div class="era">
+          ${timelineHTML(S.round)}
+          <div class="year">${esc(e.year)}</div>
+          <h1>${esc(e.title)}</h1>
+          <div class="place">${esc(e.place)}</div>
+          <p class="scene">${esc(e.scene)}</p>
+          <div class="rulebox"><span class="label">Neu an diesem Tag</span><p>${esc(e.rule)}</p>
+          ${S.round === 3 && S.wagesForHousework ? '<p style="margin-top:8px"><b>Beschlossen:</b> Care-Stunden daheim werden mit 2 bezahlt, finanziert über 20 % Steuer auf Erwerbseinkommen.</p>' : ''}</div>
+        </div>
+        <figure class="witness card">
+          <span class="label">Eine Stimme aus dieser Zeit</span>
+          <blockquote>${esc(w.quote)}</blockquote>
+          <figcaption><b>${esc(w.name)}, ${esc(w.age)}</b> · ${esc(w.who)}</figcaption>
+          <p class="fict">Fiktive Figur, historisch typisch</p>
+          <div class="bg"><span class="label">Hintergrund</span><p>${esc(w.background)}</p></div>
+        </figure>
+      </section>`;
+    dock.innerHTML = `
+      <div class="left"><span class="label">Vorlesen oder kurz wirken lassen. Am Handy sehen alle ihre Rolle.</span></div>
+      <div class="right">${endControl()}<button class="btn ghost" data-begin="0">Ohne Timer starten</button><button class="btn stamp" data-begin="90">Tag beginnen · 90 Sek.</button></div>`;
+  }
+
   function renderPlay() {
     const e = S.epoch;
     const done = S.players.filter((p) => p.submitted).length;
+    const chose = S.players.filter((p) => p.chose).length;
     main.innerHTML = `
       <section class="stage">
         <div class="era">
           <div class="year">${esc(e.year)}</div>
           <h1>${esc(e.title)}</h1>
           <div class="place">${esc(e.place)}</div>
-          <div class="history">${e.history.map((p) => `<p>${esc(p)}</p>`).join('')}</div>
+          <p class="scene">${esc(e.scene)}</p>
           <div class="rulebox"><span class="label">Spielregel heute</span><p>${esc(e.rule)}</p>
           ${S.round === 3 && S.wagesForHousework ? '<p style="margin-top:8px"><b>Beschlossen:</b> Care-Stunden daheim werden mit 2 bezahlt, finanziert über 20 % Steuer auf Erwerbseinkommen.</p>' : ''}</div>
         </div>
@@ -171,7 +228,7 @@
       </section>`;
     dock.innerHTML = `
       <div class="left">
-        <span class="count"><b>${done}</b> von ${S.players.length} Karten abgegeben</span>
+        <span class="count"><b>${chose}</b> entschieden · <b>${done}</b> von ${S.players.length} Karten abgegeben</span>
         <span id="timer" class="count" style="color:var(--alert)"></span>
         <button class="btn ghost small" data-timer="90">90 Sek.</button>
         <button class="btn ghost small" data-timer="180">3 Min.</button>
@@ -209,6 +266,9 @@
     if (e.careProd) callouts.push(`<div class="callout">Am Hof zählte Care noch zur Hälfte als Produktion. Ab morgen nicht mehr.</div>`);
     if (e.strike) callouts.push(`<div class="callout bad"><b class="num">${L.strikers}</b> Personen haben gestreikt.</div>`);
     if (L.vote) callouts.push(`<div class="callout">Lohn für Hausarbeit: <b class="num">${L.vote.yes}</b> dafür, <b class="num">${L.vote.no}</b> dagegen. <b>${L.vote.passed ? 'Angenommen, gilt ab morgen.' : 'Abgelehnt.'}</b></div>`);
+    const lockedPaid = Object.values(L.players).reduce((s, p) => s + (p.lockE || 0), 0);
+    const lockedCare = Object.values(L.players).reduce((s, p) => s + (p.lock && p.lock.kind !== 'E' ? p.lock.n : 0), 0);
+    if (lockedPaid || lockedCare) callouts.push(`<div class="callout">Durch eure Entscheidungen: <b class="num">${lockedPaid}</b> Stunden zusätzliche Erwerbsarbeit, <b class="num">${lockedCare}</b> Stunden Care und anderes Unbezahltes.</div>`);
     const missing = Object.values(L.households).filter((h) => h.deficit > 0).length;
     if (missing) callouts.push(`<div class="callout bad">In <b class="num">${missing}</b> Haushalt${missing > 1 ? 'en' : ''} ist Care liegen geblieben. Dort sinkt morgen auch die Produktivität.</div>`);
 
@@ -240,7 +300,7 @@
     const care = P.reduce((s, p) => s + p.totals.care, 0);
     const paid = P.reduce((s, p) => s + p.totals.paidCare, 0);
     const CARE_PRICE = 5;
-    const titles = ['Die offizielle Bilanz', 'Was nicht gezählt wurde', 'Wie es den Haushalten ging', 'Zur Diskussion'];
+    const titles = ['Die offizielle Bilanz', 'Was nicht gezählt wurde', 'Wie es den Haushalten ging', 'Und in Wirklichkeit?', 'Zur Diskussion'];
     let body = '';
 
     if (step === 0) {
@@ -300,9 +360,42 @@
             </div>
           </article>`;
         }).join('')}</div>`;
+    } else if (step === 3) {
+      const F = S.facts;
+      const A = F.austria;
+      const gameWork = P.reduce((s, p) => s + p.totals.work, 0);
+      const gameShare = care + gameWork ? Math.round((care / (care + gameWork)) * 100) : 0;
+      const realShare = Math.round(((A.careHours.women + A.careHours.men) / (A.careHours.women + A.careHours.men + Number(A.women.paid.replace(',', '.')) + Number(A.men.paid.replace(',', '.')))) * 100);
+      body = `
+        <div class="final-h"><h1>${titles[3]}</h1><p>Das Spiel ist ausgedacht. Diese Zahlen nicht.</p></div>
+        <div class="facts-grid">
+          <article class="card fact big">
+            <span class="label">${esc(A.title)} · unbezahlte Arbeit pro Tag</span>
+            <div class="pair"><div><b>${esc(A.women.unpaid)}</b><span>Frauen</span></div><div><b>${esc(A.men.unpaid)}</b><span>Männer</span></div></div>
+            <p>Bei der Erwerbsarbeit ist es umgekehrt: Frauen ${esc(A.women.paid)} Std., Männer ${esc(A.men.paid)} Std. pro Tag.</p>
+            <small>${esc(A.note)} Quelle: ${esc(A.source)}</small>
+          </article>
+          <article class="card fact">
+            <span class="label">Anteil unbezahlter Care an aller Arbeit</span>
+            <div class="pair"><div><b>${gameShare} %</b><span>in unserem Spiel</span></div><div><b>${realShare} %</b><span>in Österreich</span></div></div>
+            <small>Österreich: Sorgearbeit im Verhältnis zu Sorgearbeit plus Erwerbstätigkeit, Frauen und Männer zusammen. Quelle: ${esc(A.source)}</small>
+          </article>
+          <article class="card fact">
+            <span class="label">Weltweit</span>
+            <div class="pair"><div><b>${esc(F.world.hours)}</b><span>Stunden pro Tag</span></div><div><b>${esc(F.world.share)}</b><span>von Frauen</span></div></div>
+            <p>${esc(F.world.hours)} ${esc(F.world.text)} ${esc(F.world.share)} ${esc(F.world.shareText)}</p>
+            <small>Quelle: ${esc(F.world.source)}</small>
+          </article>
+          <article class="card fact">
+            <span class="label">Care-Ketten</span>
+            <div class="pair"><div><b>${esc(F.chains.value)}</b><span></span></div></div>
+            <p>${esc(F.chains.text)}</p>
+            <small>Quelle: ${esc(F.chains.source)}</small>
+          </article>
+        </div>`;
     } else {
       body = `
-        <div class="final-h"><h1>${titles[3]}</h1></div>
+        <div class="final-h"><h1>${titles[4]}</h1></div>
         <section class="discuss">
           <ul class="questions">
             <li>Wer hat Care übernommen, obwohl es keine Punkte brachte? Warum?</li>
@@ -327,9 +420,9 @@
     dock.innerHTML = `
       <div class="left">
         ${step > 0 ? `<button class="btn ghost small" data-step="${step - 1}">Zurück</button>` : ''}
-        <span class="label">${step + 1} / 4 · ${titles[step]}</span>
+        <span class="label">${step + 1} / ${titles.length} · ${titles[step]}</span>
       </div>
-      <div class="right">${endControl()}${step < 3 ? `<button class="btn stamp" data-step="${step + 1}">${titles[step + 1]}</button>` : ''}</div>`;
+      <div class="right">${endControl()}${step < titles.length - 1 ? `<button class="btn stamp" data-step="${step + 1}">${titles[step + 1]}</button>` : ''}</div>`;
   }
 
   function endControl() {
@@ -343,6 +436,8 @@
     masthead();
     if (!S) return renderIntro();
     if (S.phase === 'lobby') return renderLobby();
+    if (S.phase === 'prolog') return renderProlog();
+    if (S.phase === 'intro') return renderEpochIntro();
     if (S.phase === 'play') return renderPlay();
     if (S.phase === 'result') return renderResult();
     if (S.phase === 'final') return renderFinal();
@@ -354,6 +449,7 @@
     if (!el) return;
     if (!S.timerEnd) { el.textContent = ''; return; }
     const tick = () => {
+      if (!S || !S.timerEnd || !el.isConnected) { clearInterval(timerHandle); return; }
       const left = Math.max(0, Math.round((S.timerEnd - Date.now()) / 1000));
       el.textContent = `⏱ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
       if (!left) { clearInterval(timerHandle); el.textContent = 'Zeit ist um'; }
@@ -377,6 +473,9 @@
       });
     } else if (b.id === 'start') act('start');
     else if (b.id === 'resolve') act('resolve');
+    else if (b.id === 'rounds') act('rounds');
+    else if (b.dataset.prolog !== undefined) act('prolog', Number(b.dataset.prolog));
+    else if (b.dataset.begin !== undefined) act('begin', Number(b.dataset.begin));
     else if (b.id === 'next') act('next');
     else if (b.dataset.timer !== undefined) act('timer', Number(b.dataset.timer));
     else if (b.dataset.step !== undefined) act('finalStep', Number(b.dataset.step));
